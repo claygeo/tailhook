@@ -1,0 +1,2693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Naval Flight Simulation - Clean Interface</title>
+    <style>
+        body { 
+            margin: 0; 
+            padding: 0;
+            overflow: hidden; 
+            background: linear-gradient(to bottom, #87CEEB 0%, #4682B4 50%, #191970 100%);
+            font-family: 'Courier New', monospace;
+            width: 100vw;
+            height: 100vh;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -khtml-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+        #canvas { 
+            display: block; 
+            width: 100vw; 
+            height: 100vh; 
+            position: absolute;
+            top: 0;
+            left: 0;
+            touch-action: none;
+        }
+        #stats { 
+            position: absolute; 
+            top: 10px; 
+            left: 10px; 
+            z-index: 100;
+        }
+
+        #health-bar {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 320px;
+            height: 28px;
+            background: rgba(0,0,0,0.9);
+            border: 2px solid #44ffdd;
+            border-radius: 18px;
+            padding: 4px;
+            z-index: 100;
+            backdrop-filter: blur(15px);
+            box-shadow: 0 12px 40px rgba(68,255,221,0.4);
+        }
+        #health-fill {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(45deg, #33ff33, #66ff66, #88ffaa);
+            border-radius: 14px;
+            transition: width 0.3s ease, background 0.3s ease;
+            box-shadow: 0 0 25px rgba(51,255,51,0.5);
+        }
+        #health-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-weight: bold;
+            font-size: 13px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.9);
+        }
+
+        /* Boarding Notification */
+        #board-notification {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.9);
+            color: #44ffdd;
+            padding: 20px 40px;
+            border-radius: 12px;
+            border: 3px solid #44ffdd;
+            font-size: 20px;
+            font-weight: bold;
+            text-align: center;
+            z-index: 200;
+            backdrop-filter: blur(20px);
+            box-shadow: 0 0 40px rgba(68,255,221,0.6);
+            display: none;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: translate(-50%, -50%) scale(1); }
+            50% { transform: translate(-50%, -50%) scale(1.05); }
+        }
+
+        /* Aircraft Selection Interface */
+        #aircraft-selection {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: linear-gradient(135deg, #0a0a1a 0%, #1a1a2e 30%, #16213e 70%, #0f172a 100%);
+            display: none;
+            z-index: 300;
+            color: white;
+            font-family: 'Courier New', monospace;
+            overflow-y: auto;
+        }
+
+        .hangar-hud {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            width: 90%;
+            max-width: 1000px;
+            min-height: 90vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 20px 0;
+        }
+
+        .hangar-title {
+            font-size: clamp(24px, 4vw, 42px);
+            color: #44ffdd;
+            margin-bottom: 35px;
+            font-weight: bold;
+            text-shadow: 0 0 30px rgba(68,255,221,1.0);
+            border-bottom: 3px solid #44ffdd;
+            padding-bottom: 12px;
+        }
+
+        .aircraft-display {
+            background: rgba(0,0,0,0.9);
+            border: 4px solid #44ffdd;
+            border-radius: 20px;
+            padding: clamp(20px, 3vw, 35px);
+            margin: 25px 0;
+            box-shadow: 0 0 60px rgba(68,255,221,0.7);
+            backdrop-filter: blur(25px);
+        }
+
+        .aircraft-name {
+            font-size: clamp(20px, 3vw, 32px);
+            color: #44ffdd;
+            margin-bottom: 18px;
+            font-weight: bold;
+            text-transform: uppercase;
+            text-shadow: 0 0 20px rgba(68,255,221,0.8);
+        }
+
+        .aircraft-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 20px;
+            margin: 25px 0;
+        }
+
+        .stat-item {
+            text-align: center;
+            background: rgba(68,255,221,0.15);
+            padding: clamp(12px, 2vw, 18px);
+            border-radius: 10px;
+            border: 2px solid rgba(68,255,221,0.4);
+            backdrop-filter: blur(15px);
+            transition: all 0.3s ease;
+        }
+
+        .stat-item:hover {
+            background: rgba(68,255,221,0.25);
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(68,255,221,0.4);
+        }
+
+        .stat-label {
+            font-size: clamp(10px, 1.5vw, 13px);
+            color: #bbb;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .stat-value {
+            font-size: clamp(14px, 2vw, 20px);
+            font-weight: bold;
+            color: #44ffdd;
+        }
+
+        .star-rating {
+            color: #ffaa44;
+            font-size: clamp(12px, 2vw, 18px);
+            margin-top: 6px;
+            text-shadow: 0 0 15px rgba(255,170,68,0.6);
+        }
+
+        .aircraft-special {
+            background: rgba(68,255,221,0.25);
+            border: 3px solid #44ffdd;
+            border-radius: 12px;
+            padding: clamp(12px, 2vw, 18px);
+            margin: 25px 0;
+            font-style: italic;
+            color: #44ffdd;
+            backdrop-filter: blur(15px);
+            box-shadow: 0 0 30px rgba(68,255,221,0.4);
+            font-size: clamp(12px, 1.5vw, 16px);
+        }
+
+        .hangar-controls {
+            margin-top: 35px;
+            font-size: clamp(14px, 2vw, 18px);
+        }
+
+        .control-hint {
+            margin: 12px 0;
+            color: #ddd;
+            background: rgba(68,255,221,0.15);
+            padding: 10px;
+            border-radius: 6px;
+            backdrop-filter: blur(8px);
+            font-size: clamp(12px, 1.5vw, 16px);
+        }
+
+        .launch-button {
+            background: linear-gradient(45deg, #44aa44, #66cc66);
+            color: white;
+            border: none;
+            padding: clamp(12px, 2vw, 18px) clamp(25px, 4vw, 45px);
+            font-size: clamp(14px, 2vw, 20px);
+            font-weight: bold;
+            border-radius: 12px;
+            cursor: pointer;
+            margin-top: 25px;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            box-shadow: 0 10px 30px rgba(68,170,68,0.5);
+        }
+
+        .launch-button:hover {
+            background: linear-gradient(45deg, #66cc66, #88ee88);
+            transform: translateY(-4px);
+            box-shadow: 0 15px 45px rgba(68,170,68,0.7);
+        }
+
+        /* Clean Flight HUD - Essential Instruments Only */
+        #flight-hud {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: 120;
+            display: none;
+        }
+
+        .hud-element {
+            position: absolute;
+            color: #44ff44;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            font-size: 18px;
+            text-shadow: 0 0 15px rgba(68,255,68,1.0);
+            background: rgba(0,0,0,0.85);
+            padding: 10px 15px;
+            border-radius: 8px;
+            border: 2px solid rgba(68,255,68,0.4);
+            backdrop-filter: blur(15px);
+            box-shadow: 0 0 20px rgba(68,255,68,0.3);
+        }
+
+        /* Essential Flight Instruments */
+        #altitude-indicator { top: 25px; left: 25px; }
+        #speed-indicator { top: 70px; left: 25px; }
+        #heading-indicator { top: 115px; left: 25px; }
+        #throttle-indicator { bottom: 140px; left: 25px; }
+        #camera-mode-indicator { bottom: 95px; left: 25px; }
+
+        .artificial-horizon {
+            position: absolute;
+            top: 50%;
+            right: 60px;
+            transform: translateY(-50%);
+            width: 140px;
+            height: 140px;
+            border: 4px solid #44ff44;
+            border-radius: 50%;
+            background: linear-gradient(to bottom, #2266bb 50%, #8B4513 50%);
+            overflow: hidden;
+            box-shadow: 0 0 35px rgba(68,255,68,0.6);
+            backdrop-filter: blur(8px);
+        }
+
+        .horizon-line {
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: #44ff44;
+            transform-origin: center;
+            box-shadow: 0 0 15px rgba(68,255,68,1.0);
+        }
+
+        .aircraft-marker {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 24px;
+            height: 3px;
+            background: #ffaa44;
+        }
+
+        .aircraft-marker::before,
+        .aircraft-marker::after {
+            content: '';
+            position: absolute;
+            width: 10px;
+            height: 3px;
+            background: #ffaa44;
+            top: 0;
+        }
+
+        .aircraft-marker::before { left: -14px; }
+        .aircraft-marker::after { right: -14px; }
+
+        /* Enhanced Transition overlay */
+        #transition-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: radial-gradient(ellipse at center, #000000 0%, #001122 70%, #000033 100%);
+            display: none;
+            z-index: 400;
+            opacity: 0;
+            transition: opacity 1.5s ease;
+        }
+
+        .transition-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #44ffdd;
+            font-size: 28px;
+            text-align: center;
+            font-weight: bold;
+            text-shadow: 0 0 40px rgba(68,255,221,1.0);
+        }
+
+        /* Simplified Controls info */
+        #controls {
+            position: absolute;
+            bottom: 25px;
+            left: 25px;
+            color: white;
+            background: rgba(0,0,0,0.9);
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 11px;
+            z-index: 100;
+            border: 2px solid #44ffdd;
+            backdrop-filter: blur(15px);
+            box-shadow: 0 0 20px rgba(68,255,221,0.4);
+        }
+
+        /* Mobile Responsive Design */
+        @media (max-width: 768px) {
+            #health-bar { width: 280px; top: 12px; height: 24px; }
+            #health-text { font-size: 12px; }
+            
+            .hangar-hud { 
+                width: 95%; 
+                min-height: 85vh;
+                padding: 10px 0;
+            }
+            .hangar-title { 
+                font-size: 20px;
+                margin-bottom: 20px;
+            }
+            .aircraft-stats { 
+                grid-template-columns: 1fr 1fr;
+                gap: 15px;
+            }
+            .aircraft-display {
+                padding: 15px;
+                margin: 15px 0;
+            }
+            .aircraft-name { 
+                font-size: 18px;
+                margin-bottom: 12px;
+            }
+            .launch-button { 
+                padding: 12px 25px;
+                font-size: 16px;
+                margin-top: 20px;
+            }
+            .hangar-controls { 
+                margin-top: 20px;
+                font-size: 14px;
+            }
+            .aircraft-special {
+                margin: 15px 0;
+                padding: 12px;
+                font-size: 12px;
+            }
+            
+            .hud-element { font-size: 14px; padding: 8px 10px; }
+            .artificial-horizon { width: 100px; height: 100px; right: 25px; }
+            .transition-text { font-size: 22px; padding: 0 25px; }
+        }
+
+        @media (max-width: 480px) {
+            .hangar-hud {
+                width: 98%;
+                min-height: 80vh;
+            }
+            .aircraft-stats {
+                grid-template-columns: 1fr;
+            }
+            .hangar-title {
+                font-size: 18px;
+            }
+            .launch-button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <div id="stats"></div>
+    
+    <div id="health-bar">
+        <div id="health-fill"></div>
+        <div id="health-text">100 HP</div>
+    </div>
+    
+    <div id="board-notification">Press C to Board Carrier</div>
+
+    <div id="controls">
+        <div><strong>Controls:</strong></div>
+        <div><strong>Surface:</strong> WASD: Move | Mouse: Look | C: Board</div>
+        <div><strong>Aircraft:</strong> W/S: Throttle | A/D: Turn | Mouse: Direction</div>
+        <div><strong>Flight:</strong> Click screen to lock cursor, ESC to unlock</div>
+    </div>
+
+    <!-- Aircraft Selection Interface -->
+    <div id="aircraft-selection">
+        <div class="hangar-hud">
+            <h1 class="hangar-title">🚢 USS ENTERPRISE - AIRCRAFT HANGAR 🚢</h1>
+            <div class="aircraft-display" id="aircraft-display">
+                <!-- Aircraft info populated by JavaScript -->
+            </div>
+            <div class="hangar-controls">
+                <div class="control-hint">◄ A / D ► Navigate Aircraft Selection</div>
+                <div class="control-hint">SPACE or Click Button - Position Aircraft on Deck</div>
+                <div class="control-hint">ESC - Return to Surface Navigation</div>
+                <button class="launch-button" onclick="positionAircraftOnDeck()">🚢 POSITION ON DECK 🚢</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Clean Flight HUD - Essential Instruments Only -->
+    <div id="flight-hud">
+        <div class="hud-element" id="altitude-indicator">ALT: 0m</div>
+        <div class="hud-element" id="speed-indicator">SPD: 0 u/s</div>
+        <div class="hud-element" id="heading-indicator">HDG: 000°</div>
+        <div class="hud-element" id="throttle-indicator">THR: 0%</div>
+        <div class="hud-element" id="camera-mode-indicator">CAM: Free</div>
+        
+        <div class="artificial-horizon">
+            <div class="horizon-line"></div>
+            <div class="aircraft-marker"></div>
+        </div>
+    </div>
+
+    <!-- Transition Overlay -->
+    <div id="transition-overlay">
+        <div class="transition-text" id="transition-text">Transitioning...</div>
+    </div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.178.0/build/three.webgpu.js",
+            "three/webgpu": "https://cdn.jsdelivr.net/npm/three@0.178.0/build/three.webgpu.js",
+            "three/tsl": "https://cdn.jsdelivr.net/npm/three@0.178.0/build/three.webgpu.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.178.0/examples/jsm/"
+        }
+    }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three/webgpu';
+
+        let tslNodes = {};
+        let tslSupported = false;
+        
+        try {
+            if (THREE.positionLocal && THREE.positionWorld && THREE.normalWorld && 
+                THREE.uv && THREE.time && THREE.sin && THREE.cos && THREE.vec2 && 
+                THREE.vec3 && THREE.vec4 && THREE.float && THREE.add && THREE.mul && 
+                THREE.sub && THREE.div && THREE.pow && THREE.abs && THREE.max && 
+                THREE.min && THREE.mix && THREE.smoothstep && THREE.length && 
+                THREE.normalize && THREE.dot && THREE.cross && THREE.texture && 
+                THREE.Fn && THREE.uniform && THREE.varying && THREE.attribute && 
+                THREE.MeshStandardNodeMaterial && THREE.MeshBasicNodeMaterial) {
+                
+                tslNodes = {
+                    positionLocal: THREE.positionLocal,
+                    positionWorld: THREE.positionWorld,
+                    normalWorld: THREE.normalWorld,
+                    normalLocal: THREE.normalLocal,
+                    uv: THREE.uv,
+                    time: THREE.time,
+                    sin: THREE.sin,
+                    cos: THREE.cos,
+                    vec2: THREE.vec2,
+                    vec3: THREE.vec3,
+                    vec4: THREE.vec4,
+                    float: THREE.float,
+                    add: THREE.add,
+                    mul: THREE.mul,
+                    sub: THREE.sub,
+                    div: THREE.div,
+                    pow: THREE.pow,
+                    abs: THREE.abs,
+                    max: THREE.max,
+                    min: THREE.min,
+                    mix: THREE.mix,
+                    smoothstep: THREE.smoothstep,
+                    length: THREE.length,
+                    normalize: THREE.normalize,
+                    dot: THREE.dot,
+                    cross: THREE.cross,
+                    texture: THREE.texture,
+                    Fn: THREE.Fn,
+                    uniform: THREE.uniform,
+                    varying: THREE.varying,
+                    attribute: THREE.attribute,
+                    MeshStandardNodeMaterial: THREE.MeshStandardNodeMaterial,
+                    MeshBasicNodeMaterial: THREE.MeshBasicNodeMaterial
+                };
+                
+                tslSupported = true;
+                
+            } else {
+                throw new Error('TSL nodes not available in THREE namespace');
+            }
+        } catch (error) {
+            tslSupported = false;
+        }
+
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
+
+        const GAME_LAYERS = {
+            SURFACE: 'surface',
+            CARRIER: 'carrier',
+            AIRCRAFT: 'aircraft'
+        };
+
+        let scene, camera, renderer, stats;
+        let isWebGPU = false;
+        let tslOcean, tslSky, globalTimeUniform;
+        
+        let currentLayer = GAME_LAYERS.SURFACE;
+        let isTransitioning = false;
+        let gameObjects = {
+            submarine: null,
+            aircraft: null,
+            carrier: null,
+            player: null,
+            clouds: [],
+            islands: [],
+            terrainChunks: new Map()
+        };
+
+        // World Generation
+        const CHUNK_SIZE = 2000;
+        const RENDER_DISTANCE = 3;
+        let playerChunkX = 0, playerChunkZ = 0;
+
+        let pointerLockState = {
+            supported: false,
+            active: false,
+            element: null,
+            changeCallback: null,
+            errorCallback: null
+        };
+
+        let arcadeInputs = {
+            throttleUp: false,
+            throttleDown: false,
+            turnLeft: false,
+            turnRight: false,
+            mouseXVelocity: 0,
+            mouseYVelocity: 0,
+            cameraMode: 'free',
+            rightMouseDown: false,
+            moveForward: false,
+            moveBackward: false,
+            submarineTurnLeft: false,
+            submarineTurnRight: false
+        };
+        
+        // Smart Camera System for Submarine
+        let smartCameraControl = {
+            distance: 35,
+            sensitivity: 0.003,
+            smoothing: 0.12,
+            targetYaw: 0,
+            targetPitch: 0.3,
+            currentYaw: 0,
+            currentPitch: 0.3,
+            isDragging: false,
+            dragStartYaw: 0,
+            dragStartPitch: 0,
+            dragDelta: { x: 0, y: 0 }
+        };
+
+        let arcadeCameraControl = {
+            distance: 45,
+            sensitivity: 0.002,
+            smoothing: 0.12,
+            yawOffset: 0,
+            pitchOffset: 0.3
+        };
+
+        let submarineHealth = 100, maxHealth = 100;
+        
+        const surfaceSystem = {
+            waves: null,
+            islands: [],
+            nearCarrier: false,
+            notificationVisible: false
+        };
+
+        let selectedAircraftType = 'fighter';
+        
+        let arcadeAircraftState = {
+            position: new THREE.Vector3(),
+            velocity: new THREE.Vector3(),
+            currentSpeed: 0,
+            targetSpeed: 0,
+            minSpeed: 0,
+            maxSpeed: 120,
+            yaw: 0,
+            pitch: 0,
+            yawRate: 0,
+            pitchRate: 0,
+            altitude: 0,
+            fuel: 100,
+            throttlePercent: 0,
+            onDeck: true,
+            readyForTakeoff: false,
+            type: 'fighter'
+        };
+
+        let arcadeSubmarineState = {
+            position: new THREE.Vector3(),
+            yaw: 0,
+            speed: 0,
+            turnRate: 0
+        };
+
+        const arcadeAircraftTypes = {
+            fighter: {
+                name: 'F-18 Super Hornet',
+                minSpeed: 8.0,
+                maxSpeed: 120.0,
+                accelerationRate: 180,
+                decelerationRate: 120,
+                turnRate: 2.5,
+                pitchRate: 2.0,
+                controlSmoothness: 0.18,
+                special: 'High-speed interceptor with unlimited turning capability',
+                stats: { speed: 5, agility: 5, altitude: 4, stability: 3 }
+            },
+            bomber: {
+                name: 'B-52 Stratofortress',
+                minSpeed: 6.0,
+                maxSpeed: 70.0,
+                accelerationRate: 60,
+                decelerationRate: 45,
+                turnRate: 0.8,
+                pitchRate: 0.6,
+                controlSmoothness: 0.10,
+                special: 'Heavy bomber with extended range and payload capacity',
+                stats: { speed: 2, agility: 2, altitude: 5, stability: 5 }
+            },
+            helicopter: {
+                name: 'UH-60 Black Hawk',
+                minSpeed: 0,
+                maxSpeed: 50.0,
+                accelerationRate: 90,
+                decelerationRate: 120,
+                turnRate: 4.0,
+                pitchRate: 3.0,
+                controlSmoothness: 0.15,
+                canHover: true,
+                special: 'Versatile helicopter with hover and precise maneuverability',
+                stats: { speed: 3, agility: 4, altitude: 2, stability: 4 }
+            }
+        };
+
+        function initializePointerLock() {
+            pointerLockState.supported = !!(
+                document.pointerLockElement !== undefined ||
+                document.mozPointerLockElement !== undefined ||
+                document.webkitPointerLockElement !== undefined
+            );
+            
+            if (!pointerLockState.supported) return;
+            
+            pointerLockState.element = document.getElementById('canvas');
+            
+            pointerLockState.changeCallback = () => {
+                const locked = document.pointerLockElement === pointerLockState.element ||
+                              document.mozPointerLockElement === pointerLockState.element ||
+                              document.webkitPointerLockElement === pointerLockState.element;
+                
+                pointerLockState.active = locked;
+                
+                if (!locked) {
+                    arcadeInputs.mouseXVelocity = 0;
+                    arcadeInputs.mouseYVelocity = 0;
+                }
+            };
+            
+            pointerLockState.errorCallback = (error) => {};
+            
+            document.addEventListener('pointerlockchange', pointerLockState.changeCallback);
+            document.addEventListener('mozpointerlockchange', pointerLockState.changeCallback);
+            document.addEventListener('webkitpointerlockchange', pointerLockState.changeCallback);
+            
+            document.addEventListener('pointerlockerror', pointerLockState.errorCallback);
+            document.addEventListener('mozpointerlockerror', pointerLockState.errorCallback);
+            document.addEventListener('webkitpointerlockerror', pointerLockState.errorCallback);
+        }
+
+        function requestPointerLock() {
+            if (!pointerLockState.supported || !pointerLockState.element) return false;
+            if (currentLayer !== GAME_LAYERS.AIRCRAFT) return false;
+            
+            try {
+                if (pointerLockState.element.requestPointerLock) {
+                    pointerLockState.element.requestPointerLock();
+                } else if (pointerLockState.element.mozRequestPointerLock) {
+                    pointerLockState.element.mozRequestPointerLock();
+                } else if (pointerLockState.element.webkitRequestPointerLock) {
+                    pointerLockState.element.webkitRequestPointerLock();
+                }
+                return true;
+            } catch (error) {
+                return false;
+            }
+        }
+
+        function exitPointerLock() {
+            try {
+                if (document.exitPointerLock) {
+                    document.exitPointerLock();
+                } else if (document.mozExitPointerLock) {
+                    document.mozExitPointerLock();
+                } else if (document.webkitExitPointerLock) {
+                    document.webkitExitPointerLock();
+                }
+            } catch (error) {}
+        }
+
+        const createTSLOceanMaterial = () => {
+            try {
+                if (!tslSupported || !tslNodes.MeshStandardNodeMaterial) {
+                    throw new Error('TSL not supported or nodes unavailable');
+                }
+                
+                const material = new tslNodes.MeshStandardNodeMaterial();
+                
+                const oceanFunction = tslNodes.Fn(() => {
+                    const worldPos = tslNodes.positionWorld;
+                    const timeVal = tslNodes.time;
+                    
+                    const wave1 = tslNodes.sin(
+                        tslNodes.add(
+                            tslNodes.mul(worldPos.x, tslNodes.float(0.02)), 
+                            tslNodes.mul(timeVal, tslNodes.float(2.2))
+                        )
+                    );
+                    
+                    const wave2 = tslNodes.sin(
+                        tslNodes.add(
+                            tslNodes.mul(worldPos.z, tslNodes.float(0.015)), 
+                            tslNodes.mul(timeVal, tslNodes.float(1.8))
+                        )
+                    );
+                    
+                    const wave3 = tslNodes.sin(
+                        tslNodes.add(
+                            tslNodes.mul(
+                                tslNodes.add(worldPos.x, worldPos.z), 
+                                tslNodes.float(0.01)
+                            ), 
+                            tslNodes.mul(timeVal, tslNodes.float(1.5))
+                        )
+                    );
+                    
+                    const wave4 = tslNodes.sin(
+                        tslNodes.add(
+                            tslNodes.mul(worldPos.x, tslNodes.float(0.03)), 
+                            tslNodes.mul(timeVal, tslNodes.float(2.8))
+                        )
+                    );
+                    
+                    const combinedWaves = tslNodes.add(
+                        tslNodes.mul(wave1, tslNodes.float(1.5)),
+                        tslNodes.add(
+                            tslNodes.mul(wave2, tslNodes.float(1.0)),
+                            tslNodes.add(
+                                tslNodes.mul(wave3, tslNodes.float(0.8)),
+                                tslNodes.mul(wave4, tslNodes.float(0.4))
+                            )
+                        )
+                    );
+                    
+                    const waveHeight = tslNodes.mul(combinedWaves, tslNodes.float(0.3));
+                    
+                    const deepColor = tslNodes.vec3(0.0, 0.05, 0.2);
+                    const shallowColor = tslNodes.vec3(0.3, 0.7, 0.9);
+                    
+                    const depth = tslNodes.smoothstep(
+                        tslNodes.float(-2), 
+                        tslNodes.float(3), 
+                        waveHeight
+                    );
+                    const waterColor = tslNodes.mix(deepColor, shallowColor, depth);
+                    
+                    const foamMask = tslNodes.smoothstep(
+                        tslNodes.float(0.8), 
+                        tslNodes.float(1.2), 
+                        tslNodes.abs(waveHeight)
+                    );
+                    const foamColor = tslNodes.vec3(1.0, 1.0, 1.0);
+                    
+                    const finalColor = tslNodes.mix(
+                        waterColor, 
+                        foamColor, 
+                        tslNodes.mul(foamMask, tslNodes.float(0.9))
+                    );
+                    
+                    return tslNodes.vec4(finalColor, tslNodes.float(0.92));
+                })();
+                
+                material.colorNode = oceanFunction;
+                material.transparent = true;
+                material.side = THREE.DoubleSide;
+                
+                return material;
+                
+            } catch (error) {
+                return new THREE.MeshStandardMaterial({
+                    color: 0x006994,
+                    transparent: true,
+                    opacity: 0.9,
+                    side: THREE.DoubleSide
+                });
+            }
+        };
+
+        const createTSLSkyMaterial = () => {
+            try {
+                if (!tslSupported || !tslNodes.MeshStandardNodeMaterial) {
+                    throw new Error('TSL not supported or nodes unavailable');
+                }
+                
+                const material = new tslNodes.MeshStandardNodeMaterial();
+                
+                const skyFunction = tslNodes.Fn(() => {
+                    const worldPos = tslNodes.positionWorld;
+                    const timeVal = tslNodes.time;
+                    
+                    const altitude = tslNodes.normalLocal.y;
+                    const horizonFade = tslNodes.smoothstep(
+                        tslNodes.float(-0.2), 
+                        tslNodes.float(0.4), 
+                        altitude
+                    );
+                    
+                    const zenithColor = tslNodes.vec3(0.15, 0.45, 0.9);
+                    const horizonColor = tslNodes.vec3(0.9, 0.7, 0.5);
+                    
+                    const skyColor = tslNodes.mix(horizonColor, zenithColor, horizonFade);
+                    
+                    const cloudPos = tslNodes.mul(worldPos.xz, tslNodes.float(0.0001));
+                    const cloudNoise = tslNodes.sin(
+                        tslNodes.add(
+                            tslNodes.mul(cloudPos.x, tslNodes.float(5)), 
+                            tslNodes.mul(timeVal, tslNodes.float(0.5))
+                        )
+                    );
+                    
+                    const cloudPattern = tslNodes.smoothstep(
+                        tslNodes.float(0.4), 
+                        tslNodes.float(0.7), 
+                        cloudNoise
+                    );
+                    
+                    const cloudColor = tslNodes.vec3(1.0, 1.0, 1.0);
+                    const finalColor = tslNodes.mix(
+                        skyColor, 
+                        cloudColor, 
+                        tslNodes.mul(cloudPattern, tslNodes.float(0.6))
+                    );
+                    
+                    return tslNodes.vec4(finalColor, tslNodes.float(1.0));
+                })();
+                
+                material.colorNode = skyFunction;
+                material.side = THREE.BackSide;
+                material.fog = false;
+                
+                return material;
+                
+            } catch (error) {
+                return new THREE.MeshStandardMaterial({
+                    color: 0x87CEEB,
+                    side: THREE.BackSide,
+                    fog: false
+                });
+            }
+        };
+
+        const createTSLWeatheredMaterial = (options = {}) => {
+            try {
+                if (!tslSupported || !tslNodes.MeshStandardNodeMaterial) {
+                    throw new Error('TSL not supported or nodes unavailable');
+                }
+                
+                const material = new tslNodes.MeshStandardNodeMaterial();
+                
+                const weatheredFunction = tslNodes.Fn(() => {
+                    const worldPos = tslNodes.positionWorld;
+                    const timeVal = tslNodes.time;
+                    const baseColor = tslNodes.vec3(
+                        tslNodes.float(options.color?.r || 0.4), 
+                        tslNodes.float(options.color?.g || 0.4), 
+                        tslNodes.float(options.color?.b || 0.4)
+                    );
+                    
+                    const heightFactor = tslNodes.div(
+                        tslNodes.add(worldPos.y, tslNodes.float(20)), 
+                        tslNodes.float(100)
+                    );
+                    
+                    const exposureFactor = tslNodes.max(
+                        tslNodes.float(0), 
+                        tslNodes.dot(tslNodes.normalWorld, tslNodes.vec3(0, 1, 0))
+                    );
+                    
+                    const rustNoise = tslNodes.sin(
+                        tslNodes.add(
+                            tslNodes.mul(worldPos.x, tslNodes.float(0.02)), 
+                            tslNodes.mul(timeVal, tslNodes.float(0.001))
+                        )
+                    );
+                    
+                    const rustMask = tslNodes.smoothstep(
+                        tslNodes.float(0.3), 
+                        tslNodes.float(0.8), 
+                        tslNodes.add(rustNoise, heightFactor)
+                    );
+                    const rustColor = tslNodes.vec3(0.6, 0.25, 0.1);
+                    
+                    const finalColor = tslNodes.mix(
+                        baseColor, 
+                        rustColor, 
+                        tslNodes.mul(rustMask, tslNodes.float(0.6))
+                    );
+                    
+                    return tslNodes.vec4(finalColor, tslNodes.float(1.0));
+                })();
+                
+                material.colorNode = weatheredFunction;
+                
+                return material;
+                
+            } catch (error) {
+                return new THREE.MeshStandardMaterial({
+                    color: options.color || 0x666666,
+                    metalness: options.metalness || 0.5,
+                    roughness: options.roughness || 0.5
+                });
+            }
+        };
+
+        function createTSLEnhancedMaterial(options) {
+            if (options.tslOcean) {
+                return createTSLOceanMaterial();
+            }
+            
+            if (options.tslSky) {
+                return createTSLSkyMaterial();
+            }
+            
+            if (options.weathered) {
+                return createTSLWeatheredMaterial(options);
+            }
+            
+            return new THREE.MeshStandardMaterial({
+                color: options.color || 0x666666,
+                metalness: options.metalness || 0.0,
+                roughness: options.roughness || 0.5,
+                transparent: options.transparent || false,
+                opacity: options.opacity || 1.0,
+                emissive: options.emissive || 0x000000,
+                side: options.side || THREE.FrontSide
+            });
+        }
+
+        function createTSLOceanSystem() {
+            const oceanGeometry = new THREE.PlaneGeometry(50000, 50000, 200, 200);
+            const oceanMaterial = createTSLEnhancedMaterial({ tslOcean: true });
+            
+            const ocean = new THREE.Mesh(oceanGeometry, oceanMaterial);
+            ocean.rotation.x = -Math.PI / 2;
+            ocean.position.y = 0;
+            ocean.receiveShadow = true;
+            
+            scene.add(ocean);
+            
+            return ocean;
+        }
+
+        function createTSLSkySystem() {
+            const skyGeometry = new THREE.SphereGeometry(25000, 32, 16);
+            const skyMaterial = createTSLEnhancedMaterial({ tslSky: true });
+            
+            const sky = new THREE.Mesh(skyGeometry, skyMaterial);
+            scene.add(sky);
+            
+            return sky;
+        }
+
+        function generateIsland(x, z, seed = 0) {
+            const islandGroup = new THREE.Group();
+            
+            const islandSize = 80 + Math.sin(seed * 1.23) * 20;
+            const islandHeight = 15 + Math.cos(seed * 2.34) * 8;
+            
+            const islandMaterial = createTSLEnhancedMaterial({
+                color: new THREE.Color(0x8B4513),
+                roughness: 0.9,
+                metalness: 0.0,
+                weathered: true
+            });
+            
+            const sandMaterial = createTSLEnhancedMaterial({
+                color: new THREE.Color(0xF4E4BC),
+                roughness: 0.8,
+                metalness: 0.0
+            });
+            
+            const islandGeometry = new THREE.CylinderGeometry(islandSize * 0.3, islandSize, islandHeight, 16);
+            const island = new THREE.Mesh(islandGeometry, islandMaterial);
+            island.position.set(x, islandHeight / 2 - 2, z);
+            island.castShadow = true;
+            island.receiveShadow = true;
+            islandGroup.add(island);
+            
+            const beachGeometry = new THREE.CylinderGeometry(islandSize * 1.1, islandSize * 1.2, 3, 16);
+            const beach = new THREE.Mesh(beachGeometry, sandMaterial);
+            beach.position.set(x, 0.5, z);
+            beach.castShadow = true;
+            beach.receiveShadow = true;
+            islandGroup.add(beach);
+            
+            const palmTrunkMaterial = createTSLEnhancedMaterial({
+                color: new THREE.Color(0x8B4513),
+                roughness: 0.9,
+                metalness: 0.0,
+                weathered: true
+            });
+            
+            const palmLeafMaterial = createTSLEnhancedMaterial({
+                color: new THREE.Color(0x228B22),
+                roughness: 0.8,
+                metalness: 0.0
+            });
+            
+            const numTrees = 5 + Math.floor(Math.sin(seed * 3.45) * 3);
+            for (let i = 0; i < numTrees; i++) {
+                const angle = (i / numTrees) * Math.PI * 2 + seed;
+                const treeDistance = islandSize * 0.6 + Math.sin(seed + i) * islandSize * 0.2;
+                const treeX = x + Math.cos(angle) * treeDistance;
+                const treeZ = z + Math.sin(angle) * treeDistance;
+                const treeHeight = 12 + Math.sin(seed + i * 2) * 4;
+                
+                const trunkGeometry = new THREE.CylinderGeometry(1, 1.5, treeHeight, 8);
+                const trunk = new THREE.Mesh(trunkGeometry, palmTrunkMaterial);
+                trunk.position.set(treeX, treeHeight / 2 + islandHeight - 2, treeZ);
+                trunk.castShadow = true;
+                trunk.receiveShadow = true;
+                islandGroup.add(trunk);
+                
+                const numFronds = 6 + Math.floor(Math.sin(seed + i * 1.5) * 2);
+                for (let j = 0; j < numFronds; j++) {
+                    const frondAngle = (j / numFronds) * Math.PI * 2;
+                    const frondLength = 8 + Math.sin(seed + i + j) * 2;
+                    
+                    const frondGeometry = new THREE.BoxGeometry(0.5, 0.2, frondLength);
+                    const frond = new THREE.Mesh(frondGeometry, palmLeafMaterial);
+                    
+                    frond.position.set(
+                        treeX + Math.cos(frondAngle) * frondLength * 0.3,
+                        treeHeight + islandHeight - 2 + Math.sin(frondAngle) * 2,
+                        treeZ + Math.sin(frondAngle) * frondLength * 0.3
+                    );
+                    
+                    frond.rotation.y = frondAngle;
+                    frond.rotation.x = -0.3 + Math.sin(seed + j) * 0.2;
+                    frond.rotation.z = Math.sin(seed + i + j) * 0.1;
+                    
+                    frond.castShadow = true;
+                    islandGroup.add(frond);
+                }
+            }
+            
+            islandGroup.userData = { type: 'island', chunkX: Math.floor(x / CHUNK_SIZE), chunkZ: Math.floor(z / CHUNK_SIZE) };
+            return islandGroup;
+        }
+
+        function getChunkKey(chunkX, chunkZ) {
+            return `${chunkX},${chunkZ}`;
+        }
+
+        function generateChunk(chunkX, chunkZ) {
+            const chunkKey = getChunkKey(chunkX, chunkZ);
+            if (gameObjects.terrainChunks.has(chunkKey)) return;
+            
+            const chunkGroup = new THREE.Group();
+            
+            const seed = chunkX * 1000 + chunkZ;
+            const random = (Math.sin(seed * 12.9898) + 1) / 2;
+            
+            if (random > 0.7) {
+                const islandX = chunkX * CHUNK_SIZE + (Math.sin(seed * 2.34) * CHUNK_SIZE * 0.3);
+                const islandZ = chunkZ * CHUNK_SIZE + (Math.cos(seed * 3.45) * CHUNK_SIZE * 0.3);
+                
+                const island = generateIsland(islandX, islandZ, seed);
+                chunkGroup.add(island);
+                gameObjects.islands.push(island);
+            }
+            
+            chunkGroup.userData = { chunkX, chunkZ };
+            gameObjects.terrainChunks.set(chunkKey, chunkGroup);
+            scene.add(chunkGroup);
+        }
+
+        function updateWorldGeneration() {
+            if (!gameObjects.player) return;
+            
+            const newChunkX = Math.floor(gameObjects.player.position.x / CHUNK_SIZE);
+            const newChunkZ = Math.floor(gameObjects.player.position.z / CHUNK_SIZE);
+            
+            if (newChunkX !== playerChunkX || newChunkZ !== playerChunkZ) {
+                playerChunkX = newChunkX;
+                playerChunkZ = newChunkZ;
+                
+                for (let x = playerChunkX - RENDER_DISTANCE; x <= playerChunkX + RENDER_DISTANCE; x++) {
+                    for (let z = playerChunkZ - RENDER_DISTANCE; z <= playerChunkZ + RENDER_DISTANCE; z++) {
+                        generateChunk(x, z);
+                    }
+                }
+                
+                const chunksToRemove = [];
+                gameObjects.terrainChunks.forEach((chunk, key) => {
+                    const [chunkX, chunkZ] = key.split(',').map(Number);
+                    const distance = Math.max(Math.abs(chunkX - playerChunkX), Math.abs(chunkZ - playerChunkZ));
+                    
+                    if (distance > RENDER_DISTANCE + 1) {
+                        chunksToRemove.push(key);
+                        scene.remove(chunk);
+                        
+                        gameObjects.islands = gameObjects.islands.filter(island => {
+                            if (island.userData.chunkX === chunkX && island.userData.chunkZ === chunkZ) {
+                                return false;
+                            }
+                            return true;
+                        });
+                    }
+                });
+                
+                chunksToRemove.forEach(key => gameObjects.terrainChunks.delete(key));
+            }
+        }
+
+        function createSubmarine() {
+            const group = new THREE.Group();
+            
+            const bodyMaterial = createTSLEnhancedMaterial({ 
+                color: new THREE.Color(0xFFD700),
+                metalness: 0.7,
+                roughness: 0.2,
+                weathered: true
+            });
+            
+            const darkMaterial = createTSLEnhancedMaterial({
+                color: new THREE.Color(0x333333),
+                metalness: 0.8,
+                roughness: 0.3,
+                weathered: true
+            });
+            
+            const glassMaterial = createTSLEnhancedMaterial({
+                color: new THREE.Color(0x88CCFF),
+                transparent: true,
+                opacity: 0.3,
+                metalness: 0.0,
+                roughness: 0.0
+            });
+            
+            const bodyGeometry = new THREE.CylinderGeometry(1.8, 1.4, 14, 16);
+            const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+            body.rotation.x = Math.PI / 2;
+            body.castShadow = true;
+            body.receiveShadow = true;
+            group.add(body);
+            
+            const towerGeometry = new THREE.CylinderGeometry(1.1, 1.1, 4, 8);
+            const tower = new THREE.Mesh(towerGeometry, bodyMaterial);
+            tower.position.set(0, 2.2, 0);
+            tower.castShadow = true;
+            group.add(tower);
+            
+            const periscopeGeometry = new THREE.CylinderGeometry(0.1, 0.1, 2, 8);
+            const periscope = new THREE.Mesh(periscopeGeometry, darkMaterial);
+            periscope.position.set(0.3, 4, 1);
+            periscope.castShadow = true;
+            group.add(periscope);
+            
+            const lensGeometry = new THREE.SphereGeometry(0.15, 8, 8);
+            const lens = new THREE.Mesh(lensGeometry, glassMaterial);
+            lens.position.set(0.3, 5, 1);
+            group.add(lens);
+            
+            const propellerGroup = new THREE.Group();
+            const propHubGeometry = new THREE.CylinderGeometry(0.3, 0.3, 0.5, 8);
+            const propHub = new THREE.Mesh(propHubGeometry, darkMaterial);
+            propHub.rotation.x = Math.PI / 2;
+            propellerGroup.add(propHub);
+            
+            for (let i = 0; i < 4; i++) {
+                const bladeGeometry = new THREE.BoxGeometry(0.1, 2.5, 0.3);
+                const blade = new THREE.Mesh(bladeGeometry, darkMaterial);
+                blade.rotation.z = (i * Math.PI) / 2;
+                blade.castShadow = true;
+                propellerGroup.add(blade);
+            }
+            propellerGroup.position.set(0, 0, -7.5);
+            propellerGroup.userData = { type: 'propeller' };
+            group.add(propellerGroup);
+            
+            for (let side = -1; side <= 1; side += 2) {
+                for (let i = 0; i < 3; i++) {
+                    const tubeGeometry = new THREE.CylinderGeometry(0.2, 0.2, 1, 8);
+                    const tube = new THREE.Mesh(tubeGeometry, darkMaterial);
+                    tube.rotation.z = Math.PI / 2;
+                    tube.position.set(side * 2, 0, 2 - i * 2);
+                    tube.castShadow = true;
+                    group.add(tube);
+                    
+                    const capGeometry = new THREE.CylinderGeometry(0.15, 0.15, 0.1, 8);
+                    const cap = new THREE.Mesh(capGeometry, bodyMaterial);
+                    cap.rotation.z = Math.PI / 2;
+                    cap.position.set(side * 2.5, 0, 2 - i * 2);
+                    group.add(cap);
+                }
+            }
+            
+            return group;
+        }
+
+        function createAircraftCarrier() {
+            const group = new THREE.Group();
+            
+            const hullMaterial = createTSLEnhancedMaterial({ 
+                color: new THREE.Color(0x555555),
+                metalness: 0.6,
+                roughness: 0.4,
+                weathered: true
+            });
+            
+            const deckMaterial = createTSLEnhancedMaterial({ 
+                color: new THREE.Color(0x444444),
+                metalness: 0.3,
+                roughness: 0.8,
+                weathered: true
+            });
+            
+            const steelMaterial = createTSLEnhancedMaterial({
+                color: new THREE.Color(0x666666),
+                metalness: 0.9,
+                roughness: 0.1,
+                weathered: true
+            });
+            
+            const glassMaterial = createTSLEnhancedMaterial({
+                color: new THREE.Color(0x88CCFF),
+                transparent: true,
+                opacity: 0.4,
+                metalness: 0.0,
+                roughness: 0.0
+            });
+            
+            const hullGeometry = new THREE.BoxGeometry(300, 25, 80);
+            const hull = new THREE.Mesh(hullGeometry, hullMaterial);
+            hull.position.y = 8;
+            hull.castShadow = true;
+            hull.receiveShadow = true;
+            group.add(hull);
+            
+            const deckGeometry = new THREE.BoxGeometry(290, 3, 75);
+            const deck = new THREE.Mesh(deckGeometry, deckMaterial);
+            deck.position.y = 21;
+            deck.castShadow = true;
+            deck.receiveShadow = true;
+            group.add(deck);
+            
+            const yellowMaterial = createTSLEnhancedMaterial({ 
+                color: new THREE.Color(0xFFFF00),
+                emissive: 0x444400,
+                metalness: 0.0,
+                roughness: 0.9
+            });
+            
+            for (let i = 0; i < 15; i++) {
+                const lineGeometry = new THREE.BoxGeometry(40, 1, 1.5);
+                const line = new THREE.Mesh(lineGeometry, yellowMaterial);
+                line.position.set(-130 + i * 20, 23, 0);
+                group.add(line);
+            }
+            
+            const landingZoneGeometry = new THREE.BoxGeometry(60, 1, 30);
+            const landingZone = new THREE.Mesh(landingZoneGeometry, yellowMaterial);
+            landingZone.position.set(-100, 23.2, 0);
+            group.add(landingZone);
+            
+            const islandMaterial = createTSLEnhancedMaterial({ 
+                color: new THREE.Color(0x666666),
+                metalness: 0.7,
+                roughness: 0.3,
+                weathered: true
+            });
+            
+            const islandGeometry = new THREE.BoxGeometry(50, 35, 25);
+            const island = new THREE.Mesh(islandGeometry, islandMaterial);
+            island.position.set(100, 35, 0);
+            island.castShadow = true;
+            group.add(island);
+            
+            const towerGeometry = new THREE.BoxGeometry(20, 15, 20);
+            const tower = new THREE.Mesh(towerGeometry, islandMaterial);
+            tower.position.set(100, 55, 0);
+            tower.castShadow = true;
+            group.add(tower);
+            
+            for (let i = 0; i < 4; i++) {
+                const windowGeometry = new THREE.BoxGeometry(16, 8, 0.5);
+                const window = new THREE.Mesh(windowGeometry, glassMaterial);
+                const angle = (i * Math.PI) / 2;
+                window.position.set(
+                    100 + Math.sin(angle) * 10,
+                    55,
+                    Math.cos(angle) * 10
+                );
+                window.rotation.y = angle;
+                group.add(window);
+            }
+            
+            const radarDishGeometry = new THREE.CylinderGeometry(8, 8, 1, 16);
+            const radarDish = new THREE.Mesh(radarDishGeometry, steelMaterial);
+            radarDish.position.set(100, 65, 0);
+            radarDish.castShadow = true;
+            group.add(radarDish);
+            radarDish.userData = { type: 'radar' };
+            
+            for (let i = 0; i < 3; i++) {
+                const antennaGeometry = new THREE.CylinderGeometry(0.2, 0.2, 12, 8);
+                const antenna = new THREE.Mesh(antennaGeometry, steelMaterial);
+                antenna.position.set(95 + i * 3, 70, -8 + i * 2);
+                antenna.castShadow = true;
+                group.add(antenna);
+            }
+            
+            for (let i = 0; i < 2; i++) {
+                const catapultGeometry = new THREE.BoxGeometry(150, 0.5, 2);
+                const catapult = new THREE.Mesh(catapultGeometry, steelMaterial);
+                catapult.position.set(-50, 23.5, -25 + i * 50);
+                group.add(catapult);
+            }
+            
+            const lightMaterial = createTSLEnhancedMaterial({
+                color: new THREE.Color(0x00FF00),
+                emissive: 0x004400,
+                metalness: 0.0,
+                roughness: 0.9
+            });
+            
+            for (let i = 0; i < 20; i++) {
+                const lightGeometry = new THREE.SphereGeometry(0.5, 8, 8);
+                const light = new THREE.Mesh(lightGeometry, lightMaterial);
+                light.position.set(-140 + i * 15, 24, 30);
+                group.add(light);
+                
+                const light2 = new THREE.Mesh(lightGeometry, lightMaterial);
+                light2.position.set(-140 + i * 15, 24, -30);
+                group.add(light2);
+            }
+            
+            group.position.set(400, 5, 300);
+            group.userData = {
+                type: 'aircraft_carrier',
+                dockingRadius: 80,
+                approachRadius: 200
+            };
+            
+            return group;
+        }
+
+        function createAircraft(type) {
+            const group = new THREE.Group();
+            const config = arcadeAircraftTypes[type];
+            
+            const navyBlueMaterial = createTSLEnhancedMaterial({ 
+                color: new THREE.Color(0x1E3A8A),
+                metalness: 0.8,
+                roughness: 0.2,
+                weathered: true
+            });
+            
+            const lightGrayMaterial = createTSLEnhancedMaterial({
+                color: new THREE.Color(0xB0B0B0),
+                metalness: 0.6,
+                roughness: 0.3,
+                weathered: true
+            });
+            
+            const darkGrayMaterial = createTSLEnhancedMaterial({
+                color: new THREE.Color(0x404040),
+                metalness: 0.7,
+                roughness: 0.4,
+                weathered: true
+            });
+            
+            const glassMaterial = createTSLEnhancedMaterial({
+                color: new THREE.Color(0x88CCFF),
+                transparent: true,
+                opacity: 0.4,
+                metalness: 0.0,
+                roughness: 0.0
+            });
+            
+            const engineMaterial = createTSLEnhancedMaterial({
+                color: new THREE.Color(0x1A1A1A),
+                emissive: 0x330000,
+                metalness: 0.9,
+                roughness: 0.1
+            });
+            
+            const redMaterial = createTSLEnhancedMaterial({
+                color: new THREE.Color(0xFF0000),
+                emissive: 0x440000,
+                metalness: 0.2,
+                roughness: 0.8
+            });
+            
+            const yellowMaterial = createTSLEnhancedMaterial({
+                color: new THREE.Color(0xFFDD00),
+                emissive: 0x444400,
+                metalness: 0.3,
+                roughness: 0.7
+            });
+            
+            switch (type) {
+                case 'fighter':
+                    const fuselageGeometry = new THREE.CylinderGeometry(1.3, 0.7, 18, 12);
+                    const fuselage = new THREE.Mesh(fuselageGeometry, navyBlueMaterial);
+                    fuselage.rotation.x = Math.PI / 2;
+                    fuselage.castShadow = true;
+                    group.add(fuselage);
+                    
+                    const noseGeometry = new THREE.ConeGeometry(0.7, 4, 8);
+                    const nose = new THREE.Mesh(noseGeometry, darkGrayMaterial);
+                    nose.rotation.x = Math.PI / 2;
+                    nose.position.z = 11;
+                    nose.castShadow = true;
+                    group.add(nose);
+                    
+                    const wingGeometry = new THREE.BoxGeometry(26, 1.2, 8);
+                    const wing = new THREE.Mesh(wingGeometry, lightGrayMaterial);
+                    wing.position.y = -0.8;
+                    wing.rotation.z = -0.15;
+                    wing.castShadow = true;
+                    group.add(wing);
+                    
+                    for (let side = -1; side <= 1; side += 2) {
+                        const wingTipGeometry = new THREE.BoxGeometry(2, 0.5, 1);
+                        const wingTip = new THREE.Mesh(wingTipGeometry, darkGrayMaterial);
+                        wingTip.position.set(side * 12, -0.5, 2);
+                        wingTip.castShadow = true;
+                        group.add(wingTip);
+                        
+                        const navLightGeometry = new THREE.SphereGeometry(0.3, 8, 8);
+                        const navLight = new THREE.Mesh(navLightGeometry, side > 0 ? redMaterial : yellowMaterial);
+                        navLight.position.set(side * 13, -0.3, 2);
+                        group.add(navLight);
+                    }
+                    
+                    for (let side = -1; side <= 1; side += 2) {
+                        const tailGeometry = new THREE.BoxGeometry(1.5, 8, 5);
+                        const tail = new THREE.Mesh(tailGeometry, navyBlueMaterial);
+                        tail.position.set(side * 4, 3, -7);
+                        tail.rotation.z = side * 0.08;
+                        tail.castShadow = true;
+                        group.add(tail);
+                    }
+                    
+                    for (let side = -1; side <= 1; side += 2) {
+                        const intakeGeometry = new THREE.BoxGeometry(2.5, 2.5, 6);
+                        const intake = new THREE.Mesh(intakeGeometry, engineMaterial);
+                        intake.position.set(side * 2.5, -1.2, 1);
+                        intake.castShadow = true;
+                        group.add(intake);
+                    }
+                    
+                    for (let side = -1; side <= 1; side += 2) {
+                        const nozzleGeometry = new THREE.CylinderGeometry(1, 1.3, 4, 8);
+                        const nozzle = new THREE.Mesh(nozzleGeometry, engineMaterial);
+                        nozzle.rotation.x = Math.PI / 2;
+                        nozzle.position.set(side * 2.5, -0.8, -9);
+                        nozzle.castShadow = true;
+                        group.add(nozzle);
+                    }
+                    
+                    const canopyGeometry = new THREE.SphereGeometry(1.8, 12, 8, 0, Math.PI * 2, 0, Math.PI/2.2);
+                    const canopy = new THREE.Mesh(canopyGeometry, glassMaterial);
+                    canopy.position.set(0, 1.3, 5);
+                    canopy.castShadow = true;
+                    group.add(canopy);
+                    
+                    break;
+                    
+                case 'bomber':
+                    const bomberFuselageGeometry = new THREE.CylinderGeometry(3, 2.5, 35, 16);
+                    const bomberFuselage = new THREE.Mesh(bomberFuselageGeometry, lightGrayMaterial);
+                    bomberFuselage.rotation.x = Math.PI / 2;
+                    bomberFuselage.castShadow = true;
+                    group.add(bomberFuselage);
+                    
+                    const bomberWingGeometry = new THREE.BoxGeometry(60, 2, 15);
+                    const bomberWing = new THREE.Mesh(bomberWingGeometry, lightGrayMaterial);
+                    bomberWing.position.y = -2;
+                    bomberWing.rotation.z = -0.6;
+                    bomberWing.castShadow = true;
+                    group.add(bomberWing);
+                    
+                    const enginePylonMaterial = createTSLEnhancedMaterial({
+                        color: new THREE.Color(0x333333),
+                        metalness: 0.8,
+                        roughness: 0.2,
+                        weathered: true
+                    });
+                    
+                    for (let side = -1; side <= 1; side += 2) {
+                        const pylonGeometry = new THREE.BoxGeometry(2, 1, 8);
+                        const pylon = new THREE.Mesh(pylonGeometry, enginePylonMaterial);
+                        pylon.position.set(side * 8, -4, -2);
+                        pylon.castShadow = true;
+                        group.add(pylon);
+                        
+                        for (let engine = 0; engine < 2; engine++) {
+                            const enginePodGeometry = new THREE.CylinderGeometry(1, 1, 6, 12);
+                            const enginePod = new THREE.Mesh(enginePodGeometry, engineMaterial);
+                            enginePod.rotation.x = Math.PI / 2;
+                            enginePod.position.set(side * (7 + engine * 2), -5.5, -2);
+                            enginePod.castShadow = true;
+                            group.add(enginePod);
+                        }
+                    }
+                    
+                    for (let side = -1; side <= 1; side += 2) {
+                        const pylonGeometry = new THREE.BoxGeometry(2, 1, 6);
+                        const pylon = new THREE.Mesh(pylonGeometry, enginePylonMaterial);
+                        pylon.position.set(side * 18, -4, 0);
+                        pylon.castShadow = true;
+                        group.add(pylon);
+                        
+                        for (let engine = 0; engine < 2; engine++) {
+                            const enginePodGeometry = new THREE.CylinderGeometry(1, 1, 6, 12);
+                            const enginePod = new THREE.Mesh(enginePodGeometry, engineMaterial);
+                            enginePod.rotation.x = Math.PI / 2;
+                            enginePod.position.set(side * (17 + engine * 2), -5.5, 0);
+                            enginePod.castShadow = true;
+                            group.add(enginePod);
+                        }
+                    }
+                    
+                    const bomberTailGeometry = new THREE.BoxGeometry(3, 15, 8);
+                    const bomberTail = new THREE.Mesh(bomberTailGeometry, lightGrayMaterial);
+                    bomberTail.position.set(0, 5, -15);
+                    bomberTail.castShadow = true;
+                    group.add(bomberTail);
+                    
+                    const bomberCockpitGeometry = new THREE.SphereGeometry(2.2, 12, 8, 0, Math.PI * 2, 0, Math.PI/2.5);
+                    const bomberCockpit = new THREE.Mesh(bomberCockpitGeometry, glassMaterial);
+                    bomberCockpit.position.set(0, 2, 12);
+                    bomberCockpit.castShadow = true;
+                    group.add(bomberCockpit);
+                    
+                    break;
+                    
+                case 'helicopter':
+                    const heliBodyGeometry = new THREE.BoxGeometry(7, 5, 20);
+                    const heliBody = new THREE.Mesh(heliBodyGeometry, darkGrayMaterial);
+                    heliBody.castShadow = true;
+                    group.add(heliBody);
+                    
+                    const heliCockpitGeometry = new THREE.SphereGeometry(2.8, 12, 8, 0, Math.PI * 2, 0, Math.PI/2.2);
+                    const heliCockpit = new THREE.Mesh(heliCockpitGeometry, glassMaterial);
+                    heliCockpit.position.set(0, 2, 7);
+                    heliCockpit.castShadow = true;
+                    group.add(heliCockpit);
+                    
+                    const gearMaterial = createTSLEnhancedMaterial({ 
+                        color: new THREE.Color(0x222222), 
+                        metalness: 0.9,
+                        roughness: 0.2,
+                        weathered: true
+                    });
+                    
+                    for (let side = -1; side <= 1; side += 2) {
+                        const skidGeometry = new THREE.BoxGeometry(0.4, 0.4, 16);
+                        const skid = new THREE.Mesh(skidGeometry, gearMaterial);
+                        skid.position.set(side * 3, -3, 0);
+                        skid.castShadow = true;
+                        group.add(skid);
+                    }
+                    
+                    const rotorGroup = new THREE.Group();
+                    const hubGeometry = new THREE.CylinderGeometry(0.6, 0.6, 1.2, 8);
+                    const hub = new THREE.Mesh(hubGeometry, engineMaterial);
+                    rotorGroup.add(hub);
+                    
+                    for (let i = 0; i < 4; i++) {
+                        const bladeGeometry = new THREE.BoxGeometry(0.25, 0.15, 18);
+                        const blade = new THREE.Mesh(bladeGeometry, gearMaterial);
+                        blade.rotation.y = (i * Math.PI) / 2;
+                        blade.position.y = 0.2;
+                        blade.castShadow = true;
+                        rotorGroup.add(blade);
+                        
+                        const tipGeometry = new THREE.BoxGeometry(0.2, 0.1, 1);
+                        const tip = new THREE.Mesh(tipGeometry, yellowMaterial);
+                        tip.rotation.y = (i * Math.PI) / 2;
+                        tip.position.set(
+                            Math.sin(i * Math.PI / 2) * 9,
+                            0.2,
+                            Math.cos(i * Math.PI / 2) * 9
+                        );
+                        rotorGroup.add(tip);
+                    }
+                    rotorGroup.position.y = 5.5;
+                    group.rotorGroup = rotorGroup;
+                    group.add(rotorGroup);
+                    
+                    const tailRotorGroup = new THREE.Group();
+                    const tailHubGeometry = new THREE.CylinderGeometry(0.25, 0.25, 0.4, 8);
+                    const tailHub = new THREE.Mesh(tailHubGeometry, engineMaterial);
+                    tailRotorGroup.add(tailHub);
+                    
+                    for (let i = 0; i < 4; i++) {
+                        const tailBladeGeometry = new THREE.BoxGeometry(0.15, 0.08, 4);
+                        const tailBlade = new THREE.Mesh(tailBladeGeometry, gearMaterial);
+                        tailBlade.rotation.z = (i * Math.PI) / 2;
+                        tailBlade.castShadow = true;
+                        tailRotorGroup.add(tailBlade);
+                    }
+                    tailRotorGroup.position.set(0.8, 3, -14);
+                    tailRotorGroup.rotation.y = Math.PI / 2;
+                    group.tailRotorGroup = tailRotorGroup;
+                    group.add(tailRotorGroup);
+                    
+                    break;
+            }
+            
+            group.userData = {
+                type: 'aircraft',
+                aircraftType: type,
+                config: config
+            };
+            
+            return group;
+        }
+
+        function createTSLEnhancedEnvironment() {
+            createVolummetricClouds();
+        }
+
+        function createVolummetricClouds() {
+            const cloudMaterial = createTSLEnhancedMaterial({
+                color: new THREE.Color(0xFFFFFF),
+                transparent: true,
+                opacity: 0.7,
+                metalness: 0.0,
+                roughness: 1.0
+            });
+            
+            for (let i = 0; i < (isMobile ? 15 : 25); i++) {
+                const cloudGroup = new THREE.Group();
+                
+                for (let j = 0; j < (isMobile ? 3 : 6); j++) {
+                    const cloudGeometry = new THREE.SphereGeometry(
+                        8 + Math.random() * 15, 
+                        isMobile ? 6 : 8, 
+                        isMobile ? 6 : 8
+                    );
+                    const cloudPart = new THREE.Mesh(cloudGeometry, cloudMaterial);
+                    cloudPart.position.set(
+                        (Math.random() - 0.5) * 35,
+                        (Math.random() - 0.5) * 10,
+                        (Math.random() - 0.5) * 35
+                    );
+                    cloudPart.castShadow = false;
+                    cloudPart.receiveShadow = false;
+                    cloudGroup.add(cloudPart);
+                }
+                
+                cloudGroup.position.set(
+                    (Math.random() - 0.5) * 5000,
+                    120 + Math.random() * 250,
+                    (Math.random() - 0.5) * 5000
+                );
+                
+                cloudGroup.userData = { 
+                    speed: 0.15 + Math.random() * 0.25,
+                    direction: Math.random() * Math.PI * 2
+                };
+                
+                gameObjects.clouds.push(cloudGroup);
+                scene.add(cloudGroup);
+            }
+        }
+
+        function updateClouds() {
+            gameObjects.clouds.forEach(cloud => {
+                cloud.position.x += Math.cos(cloud.userData.direction) * cloud.userData.speed;
+                cloud.position.z += Math.sin(cloud.userData.direction) * cloud.userData.speed;
+                
+                if (gameObjects.player) {
+                    const distance = cloud.position.distanceTo(gameObjects.player.position);
+                    if (distance > 5000) {
+                        const angle = Math.random() * Math.PI * 2;
+                        const distance = 2000 + Math.random() * 1000;
+                        cloud.position.set(
+                            gameObjects.player.position.x + Math.cos(angle) * distance,
+                            cloud.position.y,
+                            gameObjects.player.position.z + Math.sin(angle) * distance
+                        );
+                    }
+                }
+            });
+        }
+
+        function createTSLEnhancedLighting() {
+            const lightsToRemove = [];
+            scene.traverse(child => {
+                if (child instanceof THREE.Light) {
+                    lightsToRemove.push(child);
+                }
+            });
+            lightsToRemove.forEach(light => scene.remove(light));
+            
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.3);
+            ambientLight.name = 'ambientLight';
+            scene.add(ambientLight);
+            
+            const sunLight = new THREE.DirectionalLight(0xFFF8DC, 1.5);
+            sunLight.position.set(400, 600, 300);
+            
+            if (!isMobile) {
+                sunLight.castShadow = true;
+                sunLight.shadow.mapSize.width = 2048;
+                sunLight.shadow.mapSize.height = 2048;
+                sunLight.shadow.camera.near = 0.5;
+                sunLight.shadow.camera.far = 1000;
+                sunLight.shadow.camera.left = -200;
+                sunLight.shadow.camera.right = 200;
+                sunLight.shadow.camera.top = 200;
+                sunLight.shadow.camera.bottom = -200;
+                sunLight.shadow.bias = -0.0001;
+                sunLight.shadow.normalBias = 0.01;
+                sunLight.shadow.radius = 4;
+            }
+            
+            sunLight.name = 'sunLight';
+            scene.add(sunLight);
+            
+            const hemisphereLight = new THREE.HemisphereLight(0x87CEEB, 0x004080, 0.8);
+            hemisphereLight.name = 'hemisphereLight';
+            scene.add(hemisphereLight);
+            
+            const rimLight = new THREE.DirectionalLight(0x88CCFF, 0.6);
+            rimLight.position.set(-300, 150, -400);
+            rimLight.name = 'rimLight';
+            scene.add(rimLight);
+            
+            const fillLight = new THREE.DirectionalLight(0xFFE4B5, 0.4);
+            fillLight.position.set(200, 300, -200);
+            fillLight.name = 'fillLight';
+            scene.add(fillLight);
+        }
+
+        function updateLighting(layer) {
+            scene.children.forEach(child => {
+                if (child instanceof THREE.DirectionalLight) {
+                    switch (layer) {
+                        case 'surface':
+                            if (child.name === 'sunLight') {
+                                child.intensity = 1.5;
+                                child.color.setHex(0xFFF8DC);
+                                child.position.set(400, 600, 300);
+                            }
+                            break;
+                        case 'aircraft':
+                            if (child.name === 'sunLight') {
+                                child.intensity = 1.8;
+                                child.color.setHex(0xFFFFEE);
+                                child.position.set(500, 800, 400);
+                            }
+                            break;
+                    }
+                }
+            });
+        }
+
+        const layerManager = {
+            async transitionTo(newLayer, duration = 3000) {
+                if (isTransitioning || newLayer === currentLayer) return false;
+                
+                isTransitioning = true;
+                
+                await this.showTransition(this.getTransitionText(currentLayer, newLayer), duration);
+                this.cleanupLayer(currentLayer);
+                await this.loadLayer(newLayer);
+                
+                currentLayer = newLayer;
+                isTransitioning = false;
+                
+                return true;
+            },
+            
+            getTransitionText(from, to) {
+                const transitions = {
+                    [`${GAME_LAYERS.SURFACE}_${GAME_LAYERS.CARRIER}`]: '⚓ Boarding Carrier...',
+                    [`${GAME_LAYERS.CARRIER}_${GAME_LAYERS.AIRCRAFT}`]: '🚀 Positioning Aircraft...',
+                    [`${GAME_LAYERS.AIRCRAFT}_${GAME_LAYERS.CARRIER}`]: '🛬 Landing on Carrier...',
+                    [`${GAME_LAYERS.CARRIER}_${GAME_LAYERS.SURFACE}`]: '⚓ Departing Carrier...'
+                };
+                return transitions[`${from}_${to}`] || `Transitioning to ${to}...`;
+            },
+            
+            async showTransition(text, duration) {
+                const overlay = document.getElementById('transition-overlay');
+                const textEl = document.getElementById('transition-text');
+                
+                textEl.textContent = text;
+                overlay.style.display = 'block';
+                
+                setTimeout(() => overlay.style.opacity = '1', 50);
+                await new Promise(resolve => setTimeout(resolve, duration));
+                
+                overlay.style.opacity = '0';
+                setTimeout(() => overlay.style.display = 'none', 1500);
+            },
+            
+            cleanupLayer(layer) {
+                switch (layer) {
+                    case GAME_LAYERS.SURFACE:
+                        document.getElementById('board-notification').style.display = 'none';
+                        surfaceSystem.notificationVisible = false;
+                        break;
+                    case GAME_LAYERS.CARRIER:
+                        document.getElementById('aircraft-selection').style.display = 'none';
+                        break;
+                    case GAME_LAYERS.AIRCRAFT:
+                        document.getElementById('flight-hud').style.display = 'none';
+                        if (pointerLockState.active) {
+                            exitPointerLock();
+                        }
+                        if (gameObjects.aircraft) {
+                            scene.remove(gameObjects.aircraft);
+                            gameObjects.aircraft = null;
+                        }
+                        break;
+                }
+            },
+            
+            async loadLayer(layer) {
+                switch (layer) {
+                    case GAME_LAYERS.SURFACE:
+                        await this.loadSurfaceLayer();
+                        break;
+                    case GAME_LAYERS.CARRIER:
+                        await this.loadCarrierLayer();
+                        break;
+                    case GAME_LAYERS.AIRCRAFT:
+                        await this.loadAircraftLayer();
+                        break;
+                }
+            },
+            
+            async loadSurfaceLayer() {
+                if (gameObjects.submarine) {
+                    gameObjects.submarine.position.y = -1;
+                    gameObjects.player = gameObjects.submarine;
+                }
+                
+                scene.fog = new THREE.FogExp2(0x87CEEB, 0.0003);
+                updateLighting('surface');
+            },
+            
+            async loadCarrierLayer() {
+                document.getElementById('aircraft-selection').style.display = 'block';
+                updateAircraftDisplay();
+            },
+            
+            async loadAircraftLayer() {
+                gameObjects.aircraft = createAircraft(selectedAircraftType);
+                
+                const carrierPos = gameObjects.carrier ? gameObjects.carrier.position : new THREE.Vector3(0, 10, 0);
+                
+                gameObjects.aircraft.position.set(carrierPos.x, carrierPos.y + 25, carrierPos.z);
+                gameObjects.aircraft.rotation.set(0, 0, 0);
+                
+                scene.add(gameObjects.aircraft);
+                gameObjects.player = gameObjects.aircraft;
+                
+                const config = arcadeAircraftTypes[selectedAircraftType];
+                
+                arcadeAircraftState = {
+                    position: new THREE.Vector3().copy(gameObjects.aircraft.position),
+                    velocity: new THREE.Vector3(),
+                    
+                    currentSpeed: 0,
+                    targetSpeed: 0,
+                    minSpeed: config.minSpeed,
+                    maxSpeed: config.maxSpeed,
+                    
+                    yaw: 0,
+                    pitch: 0,
+                    yawRate: 0,
+                    pitchRate: 0,
+                    
+                    altitude: carrierPos.y + 25,
+                    fuel: 100,
+                    throttlePercent: 0,
+                    
+                    onDeck: true,
+                    readyForTakeoff: false,
+                    type: selectedAircraftType
+                };
+                
+                arcadeInputs.mouseXVelocity = 0;
+                arcadeInputs.mouseYVelocity = 0;
+                arcadeInputs.throttleUp = false;
+                arcadeInputs.throttleDown = false;
+                arcadeInputs.turnLeft = false;
+                arcadeInputs.turnRight = false;
+                arcadeInputs.cameraMode = 'free';
+                
+                document.getElementById('flight-hud').style.display = 'block';
+                
+                scene.fog = new THREE.FogExp2(0xE6F3FF, 0.0002);
+                updateLighting('aircraft');
+            }
+        };
+
+        function createSurfaceEnvironment() {
+            tslOcean = createTSLOceanSystem();
+            surfaceSystem.waves = tslOcean;
+            
+            tslSky = createTSLSkySystem();
+            
+            gameObjects.carrier = createAircraftCarrier();
+            scene.add(gameObjects.carrier);
+            
+            createTSLEnhancedEnvironment();
+            
+            generateChunk(0, 0);
+            generateChunk(0, 1);
+            generateChunk(1, 0);
+            generateChunk(1, 1);
+        }
+
+        function updateSurface() {
+            if (currentLayer !== GAME_LAYERS.SURFACE && currentLayer !== GAME_LAYERS.AIRCRAFT) return;
+            
+            updateClouds();
+            updateWorldGeneration();
+            
+            if (gameObjects.submarine) {
+                gameObjects.submarine.children.forEach(child => {
+                    if (child.userData.type === 'propeller') {
+                        child.rotation.z += 0.4;
+                    }
+                });
+            }
+            
+            if (gameObjects.carrier) {
+                gameObjects.carrier.children.forEach(child => {
+                    if (child.userData.type === 'radar') {
+                        child.rotation.y += 0.025;
+                    }
+                });
+            }
+            
+            // Smart notification system - only show when in surface layer and near carrier
+            if (currentLayer === GAME_LAYERS.SURFACE && gameObjects.carrier && gameObjects.submarine) {
+                const distance = gameObjects.submarine.position.distanceTo(gameObjects.carrier.position);
+                const shouldShowNotification = distance < gameObjects.carrier.userData.dockingRadius;
+                
+                if (shouldShowNotification && !surfaceSystem.notificationVisible) {
+                    document.getElementById('board-notification').style.display = 'block';
+                    surfaceSystem.notificationVisible = true;
+                    surfaceSystem.nearCarrier = true;
+                } else if (!shouldShowNotification && surfaceSystem.notificationVisible) {
+                    document.getElementById('board-notification').style.display = 'none';
+                    surfaceSystem.notificationVisible = false;
+                    surfaceSystem.nearCarrier = false;
+                }
+            }
+        }
+
+        function updateArcadeSubmarine() {
+            if (!gameObjects.submarine || currentLayer === GAME_LAYERS.AIRCRAFT) return;
+            
+            const dt = 1/60;
+            const speed = 0.8;
+            const turnSpeed = 0.08;
+            
+            if (arcadeInputs.moveForward) {
+                const direction = new THREE.Vector3(0, 0, 1).applyQuaternion(gameObjects.submarine.quaternion);
+                gameObjects.submarine.position.add(direction.multiplyScalar(speed));
+            }
+            if (arcadeInputs.moveBackward) {
+                const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(gameObjects.submarine.quaternion);
+                gameObjects.submarine.position.add(direction.multiplyScalar(speed * 0.7));
+            }
+            
+            if (arcadeInputs.submarineTurnLeft) {
+                arcadeSubmarineState.yaw += turnSpeed;
+                gameObjects.submarine.rotation.y = arcadeSubmarineState.yaw;
+            }
+            if (arcadeInputs.submarineTurnRight) {
+                arcadeSubmarineState.yaw -= turnSpeed;
+                gameObjects.submarine.rotation.y = arcadeSubmarineState.yaw;
+            }
+            
+            arcadeSubmarineState.position.copy(gameObjects.submarine.position);
+            
+            if (tslOcean) {
+                const time = Date.now() * 0.001;
+                const waveHeight = Math.sin(gameObjects.submarine.position.x * 0.01 + time) * 1.5 +
+                                 Math.cos(gameObjects.submarine.position.z * 0.01 + time * 1.2) * 1.2;
+                gameObjects.submarine.position.y = -0.5 + waveHeight;
+                
+                gameObjects.submarine.rotation.x = Math.sin(time * 0.6) * 0.08;
+                gameObjects.submarine.rotation.z = Math.cos(time * 0.4) * 0.05;
+            }
+        }
+
+        function updateArcadeAircraft() {
+            if (!gameObjects.aircraft || currentLayer !== GAME_LAYERS.AIRCRAFT) return;
+            
+            const config = arcadeAircraftTypes[arcadeAircraftState.type];
+            const dt = 1/60;
+            
+            if (arcadeAircraftState.onDeck) {
+                if (arcadeInputs.throttleUp) {
+                    arcadeAircraftState.throttlePercent = Math.min(100, arcadeAircraftState.throttlePercent + 2);
+                }
+                if (arcadeInputs.throttleDown) {
+                    arcadeAircraftState.throttlePercent = Math.max(0, arcadeAircraftState.throttlePercent - 2);
+                }
+                
+                if (arcadeAircraftState.throttlePercent > 15) {
+                    arcadeAircraftState.onDeck = false;
+                    arcadeAircraftState.readyForTakeoff = true;
+                }
+                
+                updateArcadeFlightHUD();
+                return;
+            }
+            
+            if (arcadeInputs.throttleUp) {
+                arcadeAircraftState.targetSpeed = Math.min(config.maxSpeed, arcadeAircraftState.targetSpeed + config.accelerationRate * dt);
+                arcadeAircraftState.throttlePercent = Math.min(100, arcadeAircraftState.throttlePercent + 1);
+            }
+            if (arcadeInputs.throttleDown) {
+                arcadeAircraftState.targetSpeed = Math.max(config.minSpeed, arcadeAircraftState.targetSpeed - config.accelerationRate * dt);
+                arcadeAircraftState.throttlePercent = Math.max(0, arcadeAircraftState.throttlePercent - 1);
+            }
+            
+            arcadeAircraftState.currentSpeed += (arcadeAircraftState.targetSpeed - arcadeAircraftState.currentSpeed) * config.controlSmoothness;
+            
+            let turnInput = 0;
+            if (arcadeInputs.turnLeft) turnInput -= 1;
+            if (arcadeInputs.turnRight) turnInput += 1;
+            
+            if (pointerLockState.active) {
+                turnInput += arcadeInputs.mouseXVelocity * 10;
+            }
+            
+            arcadeAircraftState.yawRate += (turnInput * config.turnRate - arcadeAircraftState.yawRate) * config.controlSmoothness;
+            arcadeAircraftState.yaw += arcadeAircraftState.yawRate * dt;
+            
+            let pitchInput = 0;
+            if (pointerLockState.active) {
+                pitchInput = arcadeInputs.mouseYVelocity * 10;
+            }
+            
+            arcadeAircraftState.pitchRate += (pitchInput * config.pitchRate - arcadeAircraftState.pitchRate) * config.controlSmoothness;
+            arcadeAircraftState.pitch += arcadeAircraftState.pitchRate * dt;
+            
+            arcadeAircraftState.pitch = Math.max(-Math.PI/3, Math.min(Math.PI/3, arcadeAircraftState.pitch));
+            
+            arcadeInputs.mouseXVelocity *= 0.90;
+            arcadeInputs.mouseYVelocity *= 0.90;
+            
+            const forwardDirection = new THREE.Vector3(0, 0, 1);
+            forwardDirection.applyEuler(new THREE.Euler(arcadeAircraftState.pitch, arcadeAircraftState.yaw, 0));
+            
+            const moveVector = forwardDirection.multiplyScalar(arcadeAircraftState.currentSpeed * dt);
+            gameObjects.aircraft.position.add(moveVector);
+            
+            gameObjects.aircraft.position.y = Math.max(10, gameObjects.aircraft.position.y);
+            
+            gameObjects.aircraft.rotation.set(arcadeAircraftState.pitch, arcadeAircraftState.yaw, 0);
+            
+            arcadeAircraftState.position.copy(gameObjects.aircraft.position);
+            arcadeAircraftState.altitude = gameObjects.aircraft.position.y;
+            
+            if (arcadeAircraftState.type === 'helicopter') {
+                if (gameObjects.aircraft.rotorGroup) {
+                    gameObjects.aircraft.rotorGroup.rotation.y += 0.8;
+                }
+                if (gameObjects.aircraft.tailRotorGroup) {
+                    gameObjects.aircraft.tailRotorGroup.rotation.x += 1.2;
+                }
+            }
+            
+            updateArcadeFlightHUD();
+        }
+
+        function updateAircraftDisplay() {
+            const aircraft = arcadeAircraftTypes[selectedAircraftType];
+            const display = document.getElementById('aircraft-display');
+            
+            const getStars = (rating) => '★'.repeat(rating) + '☆'.repeat(5-rating);
+            
+            display.innerHTML = `
+                <div class="aircraft-name">${aircraft.name}</div>
+                <div class="aircraft-stats">
+                    <div class="stat-item">
+                        <div class="stat-label">MAX SPEED</div>
+                        <div class="stat-value">${aircraft.maxSpeed.toFixed(1)} u/s</div>
+                        <div class="star-rating">${getStars(aircraft.stats.speed)}</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">ACCELERATION</div>
+                        <div class="stat-value">${aircraft.accelerationRate.toFixed(0)} u/s²</div>
+                        <div class="star-rating">${getStars(aircraft.stats.agility)}</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">TURN RATE</div>
+                        <div class="stat-value">${aircraft.turnRate.toFixed(1)} r/s</div>
+                        <div class="star-rating">${getStars(aircraft.stats.altitude)}</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">STABILITY</div>
+                        <div class="stat-value">Enhanced</div>
+                        <div class="star-rating">${getStars(aircraft.stats.stability)}</div>
+                    </div>
+                </div>
+                <div class="aircraft-special">
+                    <strong>Special:</strong> ${aircraft.special}
+                </div>
+            `;
+        }
+
+        function cycleAircraft(direction) {
+            const types = Object.keys(arcadeAircraftTypes);
+            const currentIndex = types.indexOf(selectedAircraftType);
+            let newIndex = currentIndex + direction;
+            
+            if (newIndex < 0) newIndex = types.length - 1;
+            if (newIndex >= types.length) newIndex = 0;
+            
+            selectedAircraftType = types[newIndex];
+            updateAircraftDisplay();
+        }
+
+        function positionAircraftOnDeck() {
+            layerManager.transitionTo(GAME_LAYERS.AIRCRAFT, 3500);
+        }
+
+        window.positionAircraftOnDeck = positionAircraftOnDeck;
+
+        function updateArcadeFlightHUD() {
+            if (currentLayer !== GAME_LAYERS.AIRCRAFT) return;
+            
+            document.getElementById('altitude-indicator').textContent = `ALT: ${Math.round(arcadeAircraftState.altitude)}m`;
+            document.getElementById('speed-indicator').textContent = `SPD: ${arcadeAircraftState.currentSpeed.toFixed(1)} u/s`;
+            
+            const heading = THREE.MathUtils.radToDeg(arcadeAircraftState.yaw);
+            const normalizedHeading = ((heading % 360) + 360) % 360;
+            document.getElementById('heading-indicator').textContent = `HDG: ${Math.round(normalizedHeading).toString().padStart(3, '0')}°`;
+            
+            document.getElementById('throttle-indicator').textContent = `THR: ${Math.round(arcadeAircraftState.throttlePercent)}%`;
+            document.getElementById('camera-mode-indicator').textContent = `CAM: ${arcadeInputs.cameraMode}`;
+            
+            updateHealthBar();
+        }
+
+        function updateHealthBar() {
+            let healthPercent, healthText, healthColor;
+            
+            if (currentLayer === GAME_LAYERS.AIRCRAFT) {
+                healthPercent = arcadeAircraftState.fuel;
+                healthText = `${Math.floor(arcadeAircraftState.fuel)} FUEL`;
+                healthColor = healthPercent > 60 ? '#44aa44' : healthPercent > 30 ? '#ffaa44' : '#ff4444';
+            } else {
+                healthPercent = (submarineHealth / maxHealth) * 100;
+                healthText = `${Math.floor(submarineHealth)} HP`;
+                healthColor = healthPercent > 60 ? '#44aa44' : healthPercent > 30 ? '#ffaa44' : '#ff4444';
+            }
+            
+            const healthFill = document.getElementById('health-fill');
+            const healthTextEl = document.getElementById('health-text');
+            
+            healthFill.style.width = healthPercent + '%';
+            healthTextEl.textContent = healthText;
+            healthFill.style.background = `linear-gradient(45deg, ${healthColor}, ${healthColor}aa)`;
+        }
+
+        function handleLayerTransition() {
+            switch (currentLayer) {
+                case GAME_LAYERS.SURFACE:
+                    if (surfaceSystem.nearCarrier) {
+                        layerManager.transitionTo(GAME_LAYERS.CARRIER);
+                    }
+                    break;
+                case GAME_LAYERS.CARRIER:
+                    positionAircraftOnDeck();
+                    break;
+                case GAME_LAYERS.AIRCRAFT:
+                    if (gameObjects.carrier) {
+                        const distance = gameObjects.aircraft.position.distanceTo(gameObjects.carrier.position);
+                        const altitude = gameObjects.aircraft.position.y - gameObjects.carrier.position.y;
+                        if (distance < 50 && altitude < 30) {
+                            layerManager.transitionTo(GAME_LAYERS.CARRIER);
+                        }
+                    }
+                    break;
+            }
+        }
+
+        function updateArcadeCamera() {
+            if (!gameObjects.player) return;
+            
+            if (currentLayer === GAME_LAYERS.AIRCRAFT) {
+                const baseDistance = 45;
+                const speedMultiplier = arcadeAircraftState.currentSpeed * 1.2;
+                const distance = baseDistance + speedMultiplier;
+                
+                if (arcadeInputs.cameraMode === 'look') {
+                    const cameraOffset = new THREE.Vector3(
+                        Math.sin(arcadeCameraControl.yawOffset) * Math.cos(arcadeCameraControl.pitchOffset) * distance,
+                        Math.sin(arcadeCameraControl.pitchOffset) * distance + 12,
+                        Math.cos(arcadeCameraControl.yawOffset) * Math.cos(arcadeCameraControl.pitchOffset) * distance
+                    );
+                    
+                    const targetPosition = new THREE.Vector3().copy(gameObjects.aircraft.position).add(cameraOffset);
+                    camera.position.lerp(targetPosition, arcadeCameraControl.smoothing);
+                    camera.lookAt(gameObjects.aircraft.position);
+                } else {
+                    const behindOffset = new THREE.Vector3(0, 12 + speedMultiplier * 0.3, -distance);
+                    behindOffset.applyEuler(new THREE.Euler(0, arcadeAircraftState.yaw, 0));
+                    
+                    const targetPosition = new THREE.Vector3().copy(gameObjects.aircraft.position).add(behindOffset);
+                    camera.position.lerp(targetPosition, arcadeCameraControl.smoothing);
+                    
+                    const lookAhead = new THREE.Vector3(0, 0, 20 + speedMultiplier * 0.8);
+                    lookAhead.applyEuler(new THREE.Euler(arcadeAircraftState.pitch, arcadeAircraftState.yaw, 0));
+                    const lookTarget = new THREE.Vector3().copy(gameObjects.aircraft.position).add(lookAhead);
+                    camera.lookAt(lookTarget);
+                }
+                
+            } else {
+                // Smart Camera System for Submarine
+                const distance = smartCameraControl.distance;
+                
+                // Smooth interpolation towards target angles
+                smartCameraControl.currentYaw += (smartCameraControl.targetYaw - smartCameraControl.currentYaw) * smartCameraControl.smoothing;
+                smartCameraControl.currentPitch += (smartCameraControl.targetPitch - smartCameraControl.currentPitch) * smartCameraControl.smoothing;
+                
+                const cameraOffset = new THREE.Vector3(
+                    Math.sin(smartCameraControl.currentYaw) * Math.cos(smartCameraControl.currentPitch) * distance,
+                    Math.sin(smartCameraControl.currentPitch) * distance + 8,
+                    Math.cos(smartCameraControl.currentYaw) * Math.cos(smartCameraControl.currentPitch) * distance
+                );
+                
+                const targetPosition = new THREE.Vector3().copy(gameObjects.player.position).add(cameraOffset);
+                camera.position.lerp(targetPosition, smartCameraControl.smoothing);
+                camera.lookAt(gameObjects.player.position);
+            }
+        }
+
+        function setupArcadeControls() {
+            document.addEventListener('keydown', (e) => {
+                switch (e.code) {
+                    case 'KeyW': 
+                        if (currentLayer === GAME_LAYERS.AIRCRAFT) {
+                            arcadeInputs.throttleUp = true;
+                        } else {
+                            arcadeInputs.moveForward = true;
+                        }
+                        break;
+                    case 'KeyS': 
+                        if (currentLayer === GAME_LAYERS.AIRCRAFT) {
+                            arcadeInputs.throttleDown = true;
+                        } else {
+                            arcadeInputs.moveBackward = true;
+                        }
+                        break;
+                    case 'KeyA': 
+                        if (currentLayer === GAME_LAYERS.CARRIER) {
+                            cycleAircraft(-1);
+                        } else if (currentLayer === GAME_LAYERS.AIRCRAFT) {
+                            arcadeInputs.turnLeft = true;
+                        } else {
+                            arcadeInputs.submarineTurnLeft = true;
+                        }
+                        break;
+                    case 'KeyD': 
+                        if (currentLayer === GAME_LAYERS.CARRIER) {
+                            cycleAircraft(1);
+                        } else if (currentLayer === GAME_LAYERS.AIRCRAFT) {
+                            arcadeInputs.turnRight = true;
+                        } else {
+                            arcadeInputs.submarineTurnRight = true;
+                        }
+                        break;
+                    case 'Space': 
+                        e.preventDefault(); 
+                        if (currentLayer === GAME_LAYERS.CARRIER) {
+                            positionAircraftOnDeck();
+                        }
+                        break;
+                    case 'KeyC':
+                        handleLayerTransition();
+                        break;
+                    case 'Escape':
+                        e.preventDefault();
+                        if (currentLayer === GAME_LAYERS.CARRIER) {
+                            layerManager.transitionTo(GAME_LAYERS.SURFACE);
+                        } else if (currentLayer === GAME_LAYERS.AIRCRAFT && pointerLockState.active) {
+                            exitPointerLock();
+                        }
+                        break;
+                }
+            });
+            
+            document.addEventListener('keyup', (e) => {
+                switch (e.code) {
+                    case 'KeyW': 
+                        arcadeInputs.throttleUp = false;
+                        arcadeInputs.moveForward = false;
+                        break;
+                    case 'KeyS': 
+                        arcadeInputs.throttleDown = false;
+                        arcadeInputs.moveBackward = false;
+                        break;
+                    case 'KeyA': 
+                        arcadeInputs.turnLeft = false;
+                        arcadeInputs.submarineTurnLeft = false;
+                        break;
+                    case 'KeyD': 
+                        arcadeInputs.turnRight = false;
+                        arcadeInputs.submarineTurnRight = false;
+                        break;
+                }
+            });
+
+            document.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                
+                if (e.button === 0) { // Left click
+                    if (currentLayer === GAME_LAYERS.AIRCRAFT && !pointerLockState.active && 
+                        !arcadeAircraftState.onDeck) {
+                        requestPointerLock();
+                    } else if (currentLayer === GAME_LAYERS.SURFACE) {
+                        // Start smart camera drag
+                        smartCameraControl.isDragging = true;
+                        smartCameraControl.dragStartYaw = smartCameraControl.targetYaw;
+                        smartCameraControl.dragStartPitch = smartCameraControl.targetPitch;
+                        smartCameraControl.dragDelta = { x: 0, y: 0 };
+                    }
+                } else if (e.button === 2) { // Right click
+                    arcadeInputs.rightMouseDown = true;
+                    arcadeInputs.cameraMode = 'look';
+                }
+            });
+
+            document.addEventListener('mouseup', (e) => {
+                if (e.button === 0) { // Left click release
+                    if (currentLayer === GAME_LAYERS.SURFACE && smartCameraControl.isDragging) {
+                        // End smart camera drag - camera stays at current position
+                        smartCameraControl.isDragging = false;
+                    }
+                } else if (e.button === 2) { // Right click release
+                    arcadeInputs.rightMouseDown = false;
+                    arcadeInputs.cameraMode = 'free';
+                }
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                const sensitivity = smartCameraControl.sensitivity;
+                const deltaX = e.movementX || 0;
+                const deltaY = e.movementY || 0;
+                
+                if (currentLayer === GAME_LAYERS.SURFACE) {
+                    if (smartCameraControl.isDragging) {
+                        // Smart camera drag system
+                        smartCameraControl.dragDelta.x += deltaX;
+                        smartCameraControl.dragDelta.y += deltaY;
+                        
+                        smartCameraControl.targetYaw = smartCameraControl.dragStartYaw + smartCameraControl.dragDelta.x * sensitivity;
+                        smartCameraControl.targetPitch = smartCameraControl.dragStartPitch + smartCameraControl.dragDelta.y * sensitivity;
+                        
+                        // Clamp pitch
+                        smartCameraControl.targetPitch = Math.max(-Math.PI/2, Math.min(Math.PI/2, smartCameraControl.targetPitch));
+                    }
+                } else if (currentLayer === GAME_LAYERS.AIRCRAFT) {
+                    if (pointerLockState.active && !arcadeInputs.rightMouseDown) {
+                        arcadeInputs.mouseXVelocity += deltaX * arcadeCameraControl.sensitivity;
+                        arcadeInputs.mouseYVelocity += -deltaY * arcadeCameraControl.sensitivity;
+                        
+                        arcadeInputs.mouseXVelocity = Math.max(-5, Math.min(5, arcadeInputs.mouseXVelocity));
+                        arcadeInputs.mouseYVelocity = Math.max(-5, Math.min(5, arcadeInputs.mouseYVelocity));
+                        
+                    } else if (arcadeInputs.rightMouseDown) {
+                        arcadeCameraControl.yawOffset += deltaX * arcadeCameraControl.sensitivity;
+                        arcadeCameraControl.pitchOffset += deltaY * arcadeCameraControl.sensitivity;
+                        arcadeCameraControl.pitchOffset = Math.max(-Math.PI/2, Math.min(Math.PI/2, arcadeCameraControl.pitchOffset));
+                    }
+                }
+            });
+
+            document.addEventListener('wheel', (e) => {
+                const zoomSpeed = 0.05;
+                if (currentLayer === GAME_LAYERS.SURFACE) {
+                    smartCameraControl.distance += e.deltaY * zoomSpeed;
+                    smartCameraControl.distance = Math.max(15, Math.min(100, smartCameraControl.distance));
+                } else {
+                    arcadeCameraControl.distance += e.deltaY * zoomSpeed;
+                    arcadeCameraControl.distance = Math.max(20, Math.min(150, arcadeCameraControl.distance));
+                }
+                e.preventDefault();
+            });
+
+            document.addEventListener('contextmenu', (e) => e.preventDefault());
+        }
+
+        let isInitialized = false;
+        
+        async function init() {
+            if (isInitialized) return;
+            
+            try {
+                scene = new THREE.Scene();
+                scene.fog = new THREE.FogExp2(0x87CEEB, 0.0003);
+                
+                camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 15000);
+                camera.position.set(0, 30, 40);
+                
+                const hasWebGPU = navigator.gpu !== undefined;
+                
+                if (hasWebGPU) {
+                    try {
+                        renderer = new THREE.WebGPURenderer({ 
+                            canvas: document.getElementById('canvas'),
+                            antialias: !isMobile,
+                            alpha: false,
+                            powerPreference: isMobile ? 'low-power' : 'high-performance'
+                        });
+                        
+                        await renderer.init();
+                        isWebGPU = true;
+                        
+                    } catch (error) {
+                        hasWebGPU = false;
+                    }
+                }
+                
+                if (!hasWebGPU || !isWebGPU) {
+                    try {
+                        renderer = new THREE.WebGLRenderer({ 
+                            canvas: document.getElementById('canvas'),
+                            antialias: !isMobile,
+                            alpha: false,
+                            powerPreference: isMobile ? 'low-power' : 'high-performance',
+                            stencil: false,
+                            depth: true
+                        });
+                        
+                        isWebGPU = false;
+                        
+                    } catch (webglError) {
+                        document.body.innerHTML = '<div style="color: white; text-align: center; padding: 50px; font-family: Arial;">❌ WebGL/WebGPU not supported<br><br>Please use a modern browser</div>';
+                        return;
+                    }
+                }
+                
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                renderer.setClearColor(0x4682B4);
+                
+                if (renderer.shadowMap) {
+                    renderer.shadowMap.enabled = !isMobile;
+                    if (!isMobile) {
+                        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                        renderer.shadowMap.autoUpdate = true;
+                    }
+                }
+                
+                if (isWebGPU) {
+                    if (renderer.toneMapping !== undefined) {
+                        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+                        renderer.toneMappingExposure = 1.6;
+                    }
+                } else {
+                    if (renderer.outputEncoding !== undefined) {
+                        renderer.outputEncoding = THREE.sRGBEncoding;
+                    }
+                    if (renderer.toneMapping !== undefined) {
+                        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+                        renderer.toneMappingExposure = 1.6;
+                    }
+                    if (renderer.physicallyCorrectLights !== undefined) {
+                        renderer.physicallyCorrectLights = true;
+                    }
+                }
+                
+                if (isMobile) {
+                    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                } else {
+                    renderer.setPixelRatio(window.devicePixelRatio);
+                }
+                
+                if (tslSupported) {
+                    try {
+                        globalTimeUniform = tslNodes.uniform(0);
+                    } catch (error) {
+                        globalTimeUniform = null;
+                    }
+                }
+                
+                createTSLEnhancedLighting();
+                createSurfaceEnvironment();
+                
+                gameObjects.submarine = createSubmarine();
+                gameObjects.submarine.position.set(0, -1, 0);
+                scene.add(gameObjects.submarine);
+                gameObjects.player = gameObjects.submarine;
+                
+                arcadeSubmarineState.position.copy(gameObjects.submarine.position);
+                arcadeSubmarineState.yaw = 0;
+                
+                try {
+                    const statsContainer = document.getElementById('stats');
+                    const statsFPS = document.createElement('div');
+                    statsFPS.style.cssText = 'position:absolute;top:0;left:0;z-index:100;color:white;background:rgba(0,0,0,0.8);padding:5px;font-family:monospace;font-size:12px;';
+                    statsFPS.textContent = 'FPS: --';
+                    statsContainer.appendChild(statsFPS);
+                    
+                    let frameCount = 0;
+                    let lastTime = performance.now();
+                    stats = {
+                        begin: () => {},
+                        end: () => {
+                            frameCount++;
+                            if (frameCount % 60 === 0) {
+                                const now = performance.now();
+                                const fps = Math.round(60000 / (now - lastTime));
+                                statsFPS.textContent = `FPS: ${fps}`;
+                                lastTime = now;
+                            }
+                        },
+                        fps: 60
+                    };
+                    
+                } catch (error) {
+                    stats = { begin: () => {}, end: () => {}, fps: 60 };
+                }
+                
+                setupArcadeControls();
+                initializePointerLock();
+                updateAircraftDisplay();
+                
+                isInitialized = true;
+                
+                animate();
+                
+            } catch (error) {
+                document.body.innerHTML = `<div style="color: white; text-align: center; padding: 50px; font-family: Arial;">❌ Failed to initialize simulation<br><br>Error: ${error.message}</div>`;
+            }
+        }
+
+        function animate(time = 0) {
+            requestAnimationFrame(animate);
+            
+            stats.begin();
+            
+            if (tslSupported && globalTimeUniform) {
+                try {
+                    globalTimeUniform.value = time * 0.001;
+                } catch (error) {
+                    // Continue silently
+                }
+            }
+            
+            switch (currentLayer) {
+                case GAME_LAYERS.SURFACE:
+                    updateArcadeSubmarine();
+                    updateSurface();
+                    break;
+                    
+                case GAME_LAYERS.CARRIER:
+                    if (gameObjects.carrier) {
+                        gameObjects.carrier.children.forEach(child => {
+                            if (child.userData.type === 'radar') {
+                                child.rotation.y += 0.025;
+                            }
+                        });
+                    }
+                    updateClouds();
+                    updateWorldGeneration();
+                    break;
+                    
+                case GAME_LAYERS.AIRCRAFT:
+                    updateArcadeAircraft();
+                    updateSurface();
+                    break;
+            }
+            
+            updateArcadeCamera();
+            
+            renderer.render(scene, camera);
+            
+            stats.end();
+        }
+
+        window.addEventListener('resize', () => {
+            if (!camera || !renderer) return;
+            
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerWidth);
+        });
+
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
